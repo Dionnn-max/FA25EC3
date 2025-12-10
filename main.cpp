@@ -64,7 +64,7 @@ vector<StoryNodeRaw> parseStoryFile(const string &filename){
         return nodes;
     }
     string line;
-    while (getline(fin,line)) {
+    while (getline(fin,line)){
         if (line.empty()) continue;
         StoryNodeRaw node;
         size_t bracketStart = line.find('[');
@@ -77,10 +77,10 @@ vector<StoryNodeRaw> parseStoryFile(const string &filename){
         string storyText = line.substr(textMarker + 5, nextMarker - (textMarker + 5));
 
         // Clean extra spaces
-        while (!storyText.empty() && storyText[0] == ' ') {
+        while (!storyText.empty() && storyText[0] == ' '){
             storyText.erase(0, 1);
         }
-        while (!storyText.empty() && storyText.back() == ' ') {
+        while (!storyText.empty() && storyText.back() == ' '){
             storyText.pop_back();
         }
         node.text = storyText;
@@ -90,12 +90,12 @@ vector<StoryNodeRaw> parseStoryFile(const string &filename){
         stringstream ss(childrenPart);
         string childId;
 
-        while (getline(ss,childId,',')) {
+        while (getline(ss,childId,',')){
             // Clean each child ID
-            while (!childId.empty() && childId[0] == ' ') {
+            while (!childId.empty() && childId[0] == ' '){
                 childId.erase(0, 1);
             }
-            while (!childId.empty() && childId.back() == ' ') {
+            while (!childId.empty() && childId.back() == ' '){
                 childId.pop_back();
             }
 
@@ -149,12 +149,12 @@ int main() {
     adventureTree.createRoot(storyData[0].id, storyData[0].text);
 
     // Step 2: Add all other nodes and connections
-    for (const StoryNodeRaw& currentNode : storyData) {
+    for (const StoryNodeRaw& currentNode : storyData){
         // For each child of this node
-        for (const string& childId : currentNode.children) {
+        for (const string& childId : currentNode.children){
             // Find the child's text in the story data
             string childText = "";
-            for (const StoryNodeRaw& childNode : storyData) {
+            for (const StoryNodeRaw& childNode : storyData){
                 if (childNode.id == childId) {
                     childText = childNode.text;
                     break;
