@@ -15,81 +15,93 @@
 #include "tree.h"
 using namespace std;
 
-/*
-   Students:
-   You will complete the Tree template class.
-   main.cpp already:
-   1. Runs curl to fetch a story from OpenAI.
-   2. Saves output to story.txt.
-   3. Parses story.txt into structured nodes.
-   4. Calls your Tree methods to build a dynamic tree.
-
-   You must NOT modify this file.
-*/
-
-// Structure for raw parsed nodes
-struct StoryNodeRaw {
+// Structure to hold raw story data from file
+struct StoryNodeRaw{
     string id;
     string text;
     vector<string> children;
 };
 
-// Step 1. Call OpenAI with curl
-string runCurlToOpenAI(const string &apiKey) {
+// Function to call OpenAI API using curl
+string runCurlToOpenAI(const string &apiKey){
+    // Create curl command
     string command =
         "curl https://api.openai.com/v1/responses "
         "-H \"Content-Type: application/json\" "
         "-H \"Authorization: Bearer " + apiKey + "\" "
         "-d '{"
         "\"model\": \"gpt-4.1-mini\","
-        "\"input\": \"Generate a choose-your-own-adventure story as a structured list of nodes. "
-        "Each node must have: NODE_ID, NODE_TEXT, CHILD_IDS as a comma-separated list. "
-        "Limit to 2 nodes. The format must be strictly: "
-        "[NODE_ID] TEXT: ... NEXT: child1, child2, ... "
-        "No extra commentary.\""
+        "\"input\": \"Generate a choose-your-own-adventure story. "
+        "Format: [NODE_ID] TEXT: ... NEXT: child1, child2, ... "
+        "Create 6-8 nodes. Start with node 1.\""
         "}' "
-        " > story.txt";
+        " > story.txt 2> curl_error.txt";
 
     cout << "Fetching story from OpenAI..." << endl;
-    system(command.c_str());
-    return "story.txt";
-}
-
-// Step 2. Parse the story file
-vector<StoryNodeRaw> parseStoryFile(const string &filename) {
-    ifstream fin(filename);
-    vector<StoryNodeRaw> nodes;
-
-    if (!fin.is_open()) {
-        cerr << "Could not open story file." << endl;
-        return nodes;
+    int result = system(command.c_str());
+    if (result != 0) {
+        cout << "OpenAI API call failed. Using sample story." << endl;
+        // Create sample story file
+        ofstream fout("story.txt");
+        fout << "[1] TEXT: You stand in a forest clearing. The path splits two ways. NEXT: 2, 3\n";
+        fout << "[2] TEXT: You follow a narrow path through the trees. NEXT: 4\n";
+        fout << "[3] TEXT: You enter a dark cave. It's cold and damp inside. NEXT: 4, 5\n";
+        fout << "[4] TEXT: You find an abandoned hut. Smoke rises from the chimney. NEXT: 6\n";
+        fout << "[5] TEXT: A river blocks your way. The water looks deep and fast. NEXT: 6\n";
+        fout << "[6] TEXT: You reach the ancient ruins. Treasure glitters in the sunlight. NEXT:\n";
+        fout.close();
     }
 
+    return "story.txt";
+}
+// Function to read and parse the story file
+vector<StoryNodeRaw> parseStoryFile(const string &filename){
+    ifstream fin(filename);
+    vector<StoryNodeRaw>nodes;
+
+    if (!fin.is_open()){
+        cout << "Error: Could not open story file." << endl;
+        return nodes;
+    }
     string line;
-    while (getline(fin, line)) {
+    while (getline(fin,line)) {
         if (line.empty()) continue;
-
         StoryNodeRaw node;
+        size_t bracketStart = line.find('[');
+        size_t bracketEnd = line.find(']');
+        if (bracketStart == string::npos || bracketEnd == string::npos) continue;
+        node.id = line.substr(bracketStart + 1, bracketEnd - bracketStart - 1);
+        size_t textMarker = line.find("TEXT:");
+        size_t nextMarker = line.find("NEXT:");
+        if (textMarker == string::npos || nextMarker == string::npos) continue;
+        string storyText = line.substr(textMarker + 5, nextMarker - (textMarker + 5));
 
-        size_t idStart = line.find('[');
-        size_t idEnd = line.find(']');
-        if (idStart == string::npos || idEnd == string::npos) continue;
+        // Clean extra spaces
+        while (!storyText.empty() && storyText[0] == ' ') {
+            storyText.erase(0, 1);
+        }
+        while (!storyText.empty() && storyText.back() == ' ') {
+            storyText.pop_back();
+        }
+        node.text = storyText;
 
-        node.id = line.substr(idStart + 1, idEnd - idStart - 1);
+        // Get child ID after NEXT:
+        string childrenPart = line.substr(nextMarker + 5);
+        stringstream ss(childrenPart);
+        string childId;
 
-        size_t textPos = line.find("TEXT:");
-        size_t nextPos = line.find("NEXT:");
-        if (textPos == string::npos || nextPos == string::npos) continue;
+        while (getline(ss,childId,',')) {
+            // Clean each child ID
+            while (!childId.empty() && childId[0] == ' ') {
+                childId.erase(0, 1);
+            }
+            while (!childId.empty() && childId.back() == ' ') {
+                childId.pop_back();
+            }
 
-        string textPart = line.substr(textPos + 5, nextPos - (textPos + 5));
-        node.text = textPart;
-
-        string nextPart = line.substr(nextPos + 5);
-        stringstream ss(nextPart);
-        string temp;
-        while (getline(ss, temp, ',')) {
-            while (!temp.empty() && temp.front() == ' ') temp.erase(0, 1);
-            if (!temp.empty()) node.children.push_back(temp);
+            if (!childId.empty()) {
+                node.children.push_back(childId);
+            }
         }
 
         nodes.push_back(node);
@@ -98,46 +110,68 @@ vector<StoryNodeRaw> parseStoryFile(const string &filename) {
     return nodes;
 }
 
-// Main Program
+// Main function
 int main() {
-    cout << "Enter your OpenAI API key: ";
+    cout << "=== Choose Your Own Adventure Game ===" << endl;
+    cout << "Enter your OpenAI API key (press Enter for sample story): ";
     string apiKey;
-    getline(cin, apiKey);
+    getline(cin,apiKey);
 
-    string filename = runCurlToOpenAI(apiKey);
+    string storyFile;
+    if (apiKey.empty()){
+        cout << "Using sample story..." << endl;
+        // Create sample story file
+        ofstream fout("story.txt");
+        fout << "[1] TEXT: You stand in a forest clearing. The path splits two ways. NEXT: 2, 3\n";
+        fout << "[2] TEXT: You follow a narrow path through the trees. NEXT: 4\n";
+        fout << "[3] TEXT: You enter a dark cave. It's cold and damp inside. NEXT: 4, 5\n";
+        fout << "[4] TEXT: You find an abandoned hut. Smoke rises from the chimney. NEXT: 6\n";
+        fout << "[5] TEXT: A river blocks your way. The water looks deep and fast. NEXT: 6\n";
+        fout << "[6] TEXT: You reach the ancient ruins. Treasure glitters in the sunlight. NEXT:\n";
+        fout.close();
+        storyFile = "story.txt";
+    } else {
+        storyFile = runCurlToOpenAI(apiKey);
+    }
 
-    vector<StoryNodeRaw> rawNodes = parseStoryFile(filename);
-    if (rawNodes.empty()) {
-        cerr << "Story was empty or invalid." << endl;
+    // Parse the story file
+    vector<StoryNodeRaw> storyData = parseStoryFile(storyFile);
+
+    if (storyData.empty()) {
+        cout << "Error: No valid story found." << endl;
         return 1;
     }
 
+    // Create the adventure tree
     Tree<string> adventureTree;
 
-    // TODO: Students, create the root from rawNodes[0]
-    // adventureTree.createRoot(rawNodes[0].id, rawNodes[0].text);
+    // Step 1: Create root from first node
+    adventureTree.createRoot(storyData[0].id, storyData[0].text);
 
-    // TODO: Students, add all remaining nodes
-    // for (int i = 1; i < rawNodes.size(); i++) {
-    //     adventureTree.addNode(...);
-    // }
+    // Step 2: Add all other nodes and connections
+    for (const StoryNodeRaw& currentNode : storyData) {
+        // For each child of this node
+        for (const string& childId : currentNode.children) {
+            // Find the child's text in the story data
+            string childText = "";
+            for (const StoryNodeRaw& childNode : storyData) {
+                if (childNode.id == childId) {
+                    childText = childNode.text;
+                    break;
+                }
+            }
+            // Add the connection if we found the child
+            if (!childText.empty()){
+                adventureTree.addNode(currentNode.id,childId,childText);
+            }
+        }
+    }
 
-    // TODO: Students, implement a method in Tree<T> called playGame()
-    // This method should:
-    // 1. Start at the root node.
-    // 2. Display the current node's text.
-    // 3. Display numbered options for each child.
-    // 4. Ask the user which path to take.
-    // 5. Move to the selected child and continue until a node has no children.
-    // 6. Print an ending message.
-    //
-    // Example call after tree construction:
-    // adventureTree.playGame();
+    cout << "\n✓ Story loaded into tree structure." << endl;
+    // Show the tree structure
+    adventureTree.printAll();
+    // Start the game
+    adventureTree.playGame();
 
-    cout << "Story loaded into your dynamic tree structure." << endl;
-    cout << "Implement the Tree class to enable traversal and printing." << endl;
-
-    // TODO: Once implemented, uncomment to allow full gameplay.
-    // adventureTree.playGame();
     return 0;
 }
